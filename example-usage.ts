@@ -10,8 +10,8 @@
  * - local ice candidates
  */
 
-import { WebRTCReceiver } from './src/index';
 import { attachNativeVideoToElement } from './src/helpers';
+import { WebRTCReceiver } from './src/index';
 
 let viewHandle: Awaited<ReturnType<typeof attachNativeVideoToElement>> | null = null;
 

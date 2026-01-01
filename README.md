@@ -119,10 +119,10 @@ await WebRTCReceiver.stop();
 
 ## Requirements
 
-- Capacitor 5.0+
+- Capacitor 7.0+
 - **Web**: Modern browsers with WebRTC support (Chrome, Firefox, Safari, Edge)
-- **iOS**: iOS 13.0+
-- **Android**: API 22+ (Android 5.1+)
+- **iOS**: iOS 14.0+
+- **Android**: API 23+ (Android 6.0+)
 
 ## Permissions
 

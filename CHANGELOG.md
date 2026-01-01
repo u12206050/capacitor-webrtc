@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 - **Web platform support**: Full WebRTC implementation using browser APIs
+- **Capacitor 7 support**: Updated to use Capacitor 7.0+
 - Native WebRTC implementation for Android and iOS
 - Receive-only video/audio support with native video overlay rendering
 - Background audio support (iOS background audio + Android foreground service)
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Technical Details
 - Android: Kotlin implementation with WebRTC library 1.0.32006
 - iOS: Swift implementation with GoogleWebRTC CocoaPod ~> 1.1
-- Minimum iOS: 13.0
-- Minimum Android: API 22
+- Capacitor: 7.0+
+- Minimum iOS: 14.0
+- Minimum Android: API 23 (Android 6.0+)
 

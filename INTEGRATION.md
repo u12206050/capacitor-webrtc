@@ -1,5 +1,10 @@
 # Integration Guide
 
+## Prerequisites
+
+- Capacitor 7.0+
+- iOS 14.0+ / Android API 23+
+
 ## Android Setup
 
 1. **Add WebRTC dependency**: The plugin's `build.gradle` already includes the WebRTC library:

@@ -21,6 +21,15 @@ export default {
     },
   ],
   external: ['@capacitor/core'],
-  plugins: [nodeResolve(), typescript()],
+  plugins: [
+    nodeResolve({
+      browser: true,
+    }),
+    typescript({
+      tsconfig: './tsconfig.json',
+      declaration: true,
+      declarationDir: './dist/esm',
+    }),
+  ],
 };
 
