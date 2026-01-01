@@ -4,9 +4,12 @@ Capacitor plugin for WebRTC support with native video rendering. Supports both s
 
 ## Features
 
+- **Cross-platform WebRTC**: Works on Web, Android, and iOS
 - Native WebRTC implementation (Android + iOS)
+- Browser WebRTC API implementation (Web)
 - JavaScript-based signaling (pass offer/ICE in, get answer/ICE out)
-- Native video overlay rendering over WebView
+- Native video overlay rendering over WebView (mobile)
+- HTML5 video element rendering (web)
 - Background audio support (iOS background audio + Android foreground service)
 - Video pause/resume on background/foreground transitions
 - DataChannel support for bidirectional data exchange
@@ -117,8 +120,9 @@ await WebRTCReceiver.stop();
 ## Requirements
 
 - Capacitor 5.0+
-- iOS 13.0+
-- Android API 22+ (Android 5.1+)
+- **Web**: Modern browsers with WebRTC support (Chrome, Firefox, Safari, Edge)
+- **iOS**: iOS 13.0+
+- **Android**: API 22+ (Android 5.1+)
 
 ## Permissions
 
@@ -147,6 +151,11 @@ Enable Background Modes in Xcode:
 See the TypeScript definitions in `src/definitions.ts` for full API documentation.
 
 ## Troubleshooting
+
+### Web
+- **getUserMedia fails**: Ensure HTTPS (or localhost) - browsers require secure context
+- **Video not displaying**: Check browser console for errors
+- **DataChannel not working**: Verify both peers support data channels
 
 ### Android
 - **Audio stops in background**: Ensure foreground service notification is visible

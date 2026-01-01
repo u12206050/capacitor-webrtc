@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial release
+- **Web platform support**: Full WebRTC implementation using browser APIs
 - Native WebRTC implementation for Android and iOS
 - Receive-only video/audio support with native video overlay rendering
 - Background audio support (iOS background audio + Android foreground service)
