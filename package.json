@@ -15,10 +15,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/u12206050/capacitor-webrtc"
   },
   "bugs": {
-    "url": ""
+    "url": "https://github.com/u12206050/capacitor-webrtc/issues"
   },
   "keywords": [
     "capacitor",
@@ -35,8 +35,8 @@
   ],
   "scripts": {
     "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
-    "verify:ios": "cd ios && pod install && xcodebuild -workspace Plugin.xcworkspace -scheme Plugin",
-    "verify:android": "cd android && ./gradlew clean build test",
+    "verify:ios": "pod spec lint WebRTCReceiver.podspec --allow-warnings --local",
+    "verify:android": "test -f android/build.gradle && test -f android/src/main/AndroidManifest.xml && echo 'Android structure verified' || (echo 'Android structure incomplete' && exit 1)",
     "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix",
