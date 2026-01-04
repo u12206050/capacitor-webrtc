@@ -11,17 +11,17 @@
  */
 
 import { attachNativeVideoToElement } from './src/helpers';
-import { WebRTCReceiver } from './src/index';
+import { CapWebRTC } from './src/index';
 
 let viewHandle: Awaited<ReturnType<typeof attachNativeVideoToElement>> | null = null;
 
 // Listen for plugin events (we'll emit "iceCandidate" and "connectionState" from native)
-WebRTCReceiver.addListener('iceCandidate', (cand) => {
+CapWebRTC.addListener('iceCandidate', (cand) => {
   // send cand to your signaling server
   signalingSend({ type: 'ice', cand });
 });
 
-WebRTCReceiver.addListener('connectionState', (ev) => {
+CapWebRTC.addListener('connectionState', (ev) => {
   console.log('connectionState', ev);
 });
 
@@ -33,27 +33,27 @@ async function start() {
   window.addEventListener('resize', () => viewHandle?.refresh());
   window.addEventListener('scroll', () => viewHandle?.refresh(), { passive: true });
 
-  await WebRTCReceiver.start({
+  await CapWebRTC.start({
     enableBackgroundAudio: true,
     iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
   });
 
   // 1) Get remote offer from your signaling
   const offer = await waitForRemoteOffer();
-  await WebRTCReceiver.setRemoteDescription(offer);
+  await CapWebRTC.setRemoteDescription(offer);
 
   // 2) Create answer and send it back
-  const answer = await WebRTCReceiver.createAnswer();
+  const answer = await CapWebRTC.createAnswer();
   signalingSend({ type: 'answer', answer });
 
   // 3) As remote ICE arrives:
-  // await WebRTCReceiver.addIceCandidate(cand)
+  // await CapWebRTC.addIceCandidate(cand)
 }
 
 async function stop() {
   await viewHandle?.destroy();
   viewHandle = null;
-  await WebRTCReceiver.stop();
+  await CapWebRTC.stop();
 }
 
 // wire up buttons
@@ -62,8 +62,8 @@ document.getElementById('stop')!.addEventListener('click', stop);
 
 // Example: handle signaling messages
 function onSignalingMessage(msg: any) {
-  if (msg.type === 'offer') WebRTCReceiver.setRemoteDescription(msg.offer);
-  if (msg.type === 'ice') WebRTCReceiver.addIceCandidate(msg.cand);
+  if (msg.type === 'offer') CapWebRTC.setRemoteDescription(msg.offer);
+  if (msg.type === 'ice') CapWebRTC.addIceCandidate(msg.cand);
 }
 
 // Placeholder functions (implement based on your signaling mechanism)

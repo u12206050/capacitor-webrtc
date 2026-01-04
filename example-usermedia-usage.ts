@@ -3,11 +3,11 @@
  * This enables sending local camera/microphone to remote peers
  */
 
-import { WebRTCReceiver } from './src/index';
+import { CapWebRTC } from './src/index';
 
 // Get user media (camera and microphone)
 async function startLocalMedia() {
-  const { tracks } = await WebRTCReceiver.getUserMedia({
+  const { tracks } = await CapWebRTC.getUserMedia({
     audio: true,
     video: true,
     facingMode: 'user', // 'user' = front camera, 'environment' = back camera
@@ -18,7 +18,7 @@ async function startLocalMedia() {
   
   // Add tracks to peer connection
   for (const track of tracks) {
-    await WebRTCReceiver.addTrack(track.trackId);
+    await CapWebRTC.addTrack(track.trackId);
   }
   
   return tracks;
@@ -26,7 +26,7 @@ async function startLocalMedia() {
 
 // Create an offer (initiate connection)
 async function initiateCall() {
-  await WebRTCReceiver.start({
+  await CapWebRTC.start({
     iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
   });
   
@@ -34,7 +34,7 @@ async function initiateCall() {
   const tracks = await startLocalMedia();
   
   // Create offer
-  const offer = await WebRTCReceiver.createOffer();
+  const offer = await CapWebRTC.createOffer();
   console.log('Created offer:', offer);
   
   // Send offer to remote peer via signaling
@@ -42,7 +42,7 @@ async function initiateCall() {
   
   // Wait for answer
   const answer = await waitForRemoteAnswer();
-  await WebRTCReceiver.setRemoteDescription(answer);
+  await CapWebRTC.setRemoteDescription(answer);
   
   // Add ICE candidates as they arrive
   // ...
@@ -50,16 +50,16 @@ async function initiateCall() {
 
 // Switch between front and back camera
 async function switchCamera() {
-  await WebRTCReceiver.switchCamera();
+  await CapWebRTC.switchCamera();
 }
 
 // Enable/disable tracks
 async function toggleAudio() {
-  const tracks = await WebRTCReceiver.getTracks();
+  const tracks = await CapWebRTC.getTracks();
   const audioTrack = tracks.tracks.find(t => t.kind === 'audio');
   
   if (audioTrack) {
-    await WebRTCReceiver.setTrackEnabled({
+    await CapWebRTC.setTrackEnabled({
       trackId: audioTrack.trackId,
       enabled: !audioTrack.enabled,
     });
@@ -68,8 +68,8 @@ async function toggleAudio() {
 
 // Get available devices
 async function listDevices() {
-  const audioDevices = await WebRTCReceiver.getAudioInputDevices();
-  const videoDevices = await WebRTCReceiver.getVideoInputDevices();
+  const audioDevices = await CapWebRTC.getAudioInputDevices();
+  const videoDevices = await CapWebRTC.getVideoInputDevices();
   
   console.log('Audio devices:', audioDevices.devices);
   console.log('Video devices:', videoDevices.devices);
@@ -77,16 +77,16 @@ async function listDevices() {
 
 // Use specific device
 async function useSpecificCamera() {
-  const { devices } = await WebRTCReceiver.getVideoInputDevices();
+  const { devices } = await CapWebRTC.getVideoInputDevices();
   const backCamera = devices.find(d => d.label.includes('Back'));
   
   if (backCamera) {
-    const { tracks } = await WebRTCReceiver.getUserMedia({
+    const { tracks } = await CapWebRTC.getUserMedia({
       video: true,
       videoDeviceId: backCamera.deviceId,
     });
     
-    await WebRTCReceiver.addTrack(tracks[0].trackId);
+    await CapWebRTC.addTrack(tracks[0].trackId);
   }
 }
 

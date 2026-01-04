@@ -2,17 +2,17 @@
  * Example usage of DataChannel in the WebRTC Receiver plugin
  */
 
-import { WebRTCReceiver } from './src/index';
+import { CapWebRTC } from './src/index';
 
 // Listen for incoming data channels (created by remote peer)
-WebRTCReceiver.addListener('dataChannel', (event) => {
+CapWebRTC.addListener('dataChannel', (event) => {
   console.log('Data channel opened:', event.channelId, event.label);
   
   // You can now send/receive data on this channel
 });
 
 // Listen for messages on data channels
-WebRTCReceiver.addListener('dataChannelMessage', (event) => {
+CapWebRTC.addListener('dataChannelMessage', (event) => {
   console.log('Message received on channel', event.channelId);
   
   if (event.binary) {
@@ -26,14 +26,14 @@ WebRTCReceiver.addListener('dataChannelMessage', (event) => {
 });
 
 // Listen for data channel state changes
-WebRTCReceiver.addListener('dataChannelState', (event) => {
+CapWebRTC.addListener('dataChannelState', (event) => {
   console.log('Channel', event.channelId, 'state changed to:', event.state);
   // States: "connecting", "open", "closing", "closed"
 });
 
 // Create a data channel
 async function createChannel() {
-  const { channelId } = await WebRTCReceiver.createDataChannel({
+  const { channelId } = await CapWebRTC.createDataChannel({
     label: 'my-channel',
     ordered: true, // Messages are delivered in order
     maxRetransmits: 3, // Optional: max retransmission attempts
@@ -46,7 +46,7 @@ async function createChannel() {
 
 // Send text data
 async function sendText(channelId: string, message: string) {
-  await WebRTCReceiver.sendData({
+  await CapWebRTC.sendData({
     channelId,
     data: message,
     binary: false,
@@ -58,7 +58,7 @@ async function sendBinary(channelId: string, binaryData: ArrayBuffer) {
   // Convert ArrayBuffer to base64
   const base64 = btoa(String.fromCharCode(...new Uint8Array(binaryData)));
   
-  await WebRTCReceiver.sendData({
+  await CapWebRTC.sendData({
     channelId,
     data: base64,
     binary: true,
@@ -67,7 +67,7 @@ async function sendBinary(channelId: string, binaryData: ArrayBuffer) {
 
 // Send binary data (as array of numbers)
 async function sendBinaryAsArray(channelId: string, bytes: number[]) {
-  await WebRTCReceiver.sendData({
+  await CapWebRTC.sendData({
     channelId,
     data: bytes,
     binary: true,
@@ -76,13 +76,13 @@ async function sendBinaryAsArray(channelId: string, bytes: number[]) {
 
 // Close a data channel
 async function closeChannel(channelId: string) {
-  await WebRTCReceiver.closeDataChannel({ channelId });
+  await CapWebRTC.closeDataChannel({ channelId });
 }
 
 // Complete example: Create channel, send data, receive data
 async function example() {
   // Start WebRTC session first
-  await WebRTCReceiver.start({
+  await CapWebRTC.start({
     iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
   });
   

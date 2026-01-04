@@ -3,8 +3,8 @@ import Capacitor
 import WebRTC
 import AVFoundation
 
-@objc(WebRTCReceiverPlugin)
-public class WebRTCReceiverPlugin: CAPPlugin {
+@objc(CapWebRTCPlugin)
+public class CapWebRTCPlugin: CAPPlugin {
 
   private var factory: RTCPeerConnectionFactory?
   private var pc: RTCPeerConnection?
@@ -528,10 +528,10 @@ public class WebRTCReceiverPlugin: CAPPlugin {
 
 // Helper class for DataChannel delegate
 private class DataChannelDelegate: NSObject, RTCDataChannelDelegate {
-  weak var plugin: WebRTCReceiverPlugin?
+  weak var plugin: CapWebRTCPlugin?
   let channelId: String
   
-  init(plugin: WebRTCReceiverPlugin, channelId: String) {
+  init(plugin: CapWebRTCPlugin, channelId: String) {
     self.plugin = plugin
     self.channelId = channelId
   }
@@ -569,7 +569,7 @@ private class DataChannelDelegate: NSObject, RTCDataChannelDelegate {
   }
 }
 
-extension WebRTCReceiverPlugin: RTCPeerConnectionDelegate {
+extension CapWebRTCPlugin: RTCPeerConnectionDelegate {
   public func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
   public func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {}
   public func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}

@@ -1,4 +1,4 @@
-package com.capacitorjs.plugins.webrtcreceiver
+package com.capacitorjs.plugins.capwebrtc
 
 import android.app.*
 import android.content.Intent

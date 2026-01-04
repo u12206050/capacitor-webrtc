@@ -1,8 +1,9 @@
 import { registerPlugin } from '@capacitor/core';
-import type { WebRTCReceiverPlugin } from './definitions';
 
-export const WebRTCReceiver = registerPlugin<WebRTCReceiverPlugin>('WebRTCReceiver', {
-  web: () => import('./web').then(m => new m.WebRTCReceiverWeb()),
+import type { CapWebRTCPlugin } from './definitions';
+
+export const CapWebRTC = registerPlugin<CapWebRTCPlugin>('CapWebRTC', {
+  web: () => import('./web').then(m => new m.CapWebRTCWeb()),
 });
 
 export * from './definitions';

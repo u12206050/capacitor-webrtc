@@ -1,4 +1,4 @@
-package com.capacitorjs.plugins.webrtcreceiver
+package com.capacitorjs.plugins.capwebrtc
 
 import android.content.Intent
 import android.media.AudioManager
@@ -9,8 +9,8 @@ import org.webrtc.*
 import android.Manifest
 import android.content.pm.PackageManager
 
-@CapacitorPlugin(name = "WebRTCReceiver")
-class WebRTCReceiverPlugin : Plugin() {
+@CapacitorPlugin(name = "CapWebRTC")
+class CapWebRTCPlugin : Plugin() {
 
   private var factory: PeerConnectionFactory? = null
   private var pc: PeerConnection? = null

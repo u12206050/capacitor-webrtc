@@ -1,15 +1,16 @@
 import { WebPlugin } from '@capacitor/core';
+
 import type {
-    CreateDataChannelOptions,
-    CreateVideoViewOptions,
-    GetUserMediaOptions,
-    IceCandidate,
-    MediaTrack,
-    SdpDescription,
-    SendDataOptions,
-    StartOptions,
-    UpdateVideoViewOptions,
-    WebRTCReceiverPlugin,
+  CapWebRTCPlugin,
+  CreateDataChannelOptions,
+  CreateVideoViewOptions,
+  GetUserMediaOptions,
+  IceCandidate,
+  MediaTrack,
+  SdpDescription,
+  SendDataOptions,
+  StartOptions,
+  UpdateVideoViewOptions,
 } from './definitions';
 
 interface VideoView {
@@ -18,7 +19,7 @@ interface VideoView {
   stream: MediaStream | null;
 }
 
-export class WebRTCReceiverWeb extends WebPlugin implements WebRTCReceiverPlugin {
+export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
   // addListener and removeAllListeners are inherited from WebPlugin
   // notifyListeners is also inherited from WebPlugin
   
@@ -624,7 +625,7 @@ export class WebRTCReceiverWeb extends WebPlugin implements WebRTCReceiverPlugin
     }
   }
 
-  async getAudioInputDevices(): Promise<{ devices: Array<{ deviceId: string; label: string }> }> {
+  async getAudioInputDevices(): Promise<{ devices: { deviceId: string; label: string }[] }> {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioDevices = devices
       .filter((device) => device.kind === 'audioinput')
@@ -636,7 +637,7 @@ export class WebRTCReceiverWeb extends WebPlugin implements WebRTCReceiverPlugin
     return { devices: audioDevices };
   }
 
-  async getVideoInputDevices(): Promise<{ devices: Array<{ deviceId: string; label: string }> }> {
+  async getVideoInputDevices(): Promise<{ devices: { deviceId: string; label: string }[] }> {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoDevices = devices
       .filter((device) => device.kind === 'videoinput')

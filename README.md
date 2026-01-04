@@ -26,16 +26,16 @@ npx cap sync
 ## Usage
 
 ```typescript
-import { WebRTCReceiver } from 'capacitor-webrtc';
+import { CapWebRTC } from 'capacitor-webrtc';
 import { attachNativeVideoToElement } from 'capacitor-webrtc/dist/esm/helpers';
 
 // Listen for plugin events
-WebRTCReceiver.addListener('iceCandidate', (cand) => {
+CapWebRTC.addListener('iceCandidate', (cand) => {
   // Send candidate to your signaling server
   signalingSend({ type: 'ice', cand });
 });
 
-WebRTCReceiver.addListener('connectionState', (ev) => {
+CapWebRTC.addListener('connectionState', (ev) => {
   console.log('connectionState', ev);
 });
 
@@ -43,28 +43,28 @@ WebRTCReceiver.addListener('connectionState', (ev) => {
 const remoteDiv = document.getElementById('remoteVideo')!;
 const viewHandle = await attachNativeVideoToElement(remoteDiv, { mode: 'fit' });
 
-await WebRTCReceiver.start({
+await CapWebRTC.start({
   enableBackgroundAudio: true,
   iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
 });
 
 // Set remote offer
 const offer = await waitForRemoteOffer();
-await WebRTCReceiver.setRemoteDescription(offer);
+await CapWebRTC.setRemoteDescription(offer);
 
 // Create answer
-const answer = await WebRTCReceiver.createAnswer();
+const answer = await CapWebRTC.createAnswer();
 signalingSend({ type: 'answer', answer });
 
 // Add ICE candidates as they arrive
-await WebRTCReceiver.addIceCandidate(cand);
+await CapWebRTC.addIceCandidate(cand);
 
 // DataChannel support
-WebRTCReceiver.addListener('dataChannel', (event) => {
+CapWebRTC.addListener('dataChannel', (event) => {
   console.log('Data channel opened:', event.channelId);
 });
 
-WebRTCReceiver.addListener('dataChannelMessage', (event) => {
+CapWebRTC.addListener('dataChannelMessage', (event) => {
   if (event.binary) {
     // Binary data (base64 encoded)
     const data = atob(event.data);
@@ -75,20 +75,20 @@ WebRTCReceiver.addListener('dataChannelMessage', (event) => {
 });
 
 // Create a data channel
-const { channelId } = await WebRTCReceiver.createDataChannel({
+const { channelId } = await CapWebRTC.createDataChannel({
   label: 'my-channel',
   ordered: true,
 });
 
 // Send data
-await WebRTCReceiver.sendData({
+await CapWebRTC.sendData({
   channelId,
   data: 'Hello!',
   binary: false,
 });
 
 // User Media Support - Send local camera/microphone
-const { tracks } = await WebRTCReceiver.getUserMedia({
+const { tracks } = await CapWebRTC.getUserMedia({
   audio: true,
   video: true,
   facingMode: 'user', // 'user' = front, 'environment' = back
@@ -96,25 +96,25 @@ const { tracks } = await WebRTCReceiver.getUserMedia({
 
 // Add tracks to peer connection
 for (const track of tracks) {
-  await WebRTCReceiver.addTrack(track.trackId);
+  await CapWebRTC.addTrack(track.trackId);
 }
 
 // Create offer to initiate connection
-const offer = await WebRTCReceiver.createOffer();
+const offer = await CapWebRTC.createOffer();
 signalingSend({ type: 'offer', offer });
 
 // Switch camera
-await WebRTCReceiver.switchCamera();
+await CapWebRTC.switchCamera();
 
 // Enable/disable tracks
-await WebRTCReceiver.setTrackEnabled({
+await CapWebRTC.setTrackEnabled({
   trackId: tracks[0].trackId,
   enabled: false, // mute
 });
 
 // Stop session
 await viewHandle.destroy();
-await WebRTCReceiver.stop();
+await CapWebRTC.stop();
 ```
 
 ## Requirements

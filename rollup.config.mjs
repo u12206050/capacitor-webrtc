@@ -7,7 +7,7 @@ export default [
     output: {
       file: 'dist/plugin.js',
       format: 'iife',
-      name: 'capacitorWebRTCReceiver',
+      name: 'CapWebRTC',
       globals: {
         '@capacitor/core': 'capacitorExports',
       },

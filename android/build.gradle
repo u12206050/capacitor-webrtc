@@ -17,7 +17,7 @@ buildscript {
 apply plugin: 'com.android.library'
 
 android {
-    namespace "com.capacitorjs.plugins.webrtcreceiver"
+    namespace "com.capacitorjs.plugins.capwebrtc"
     compileSdkVersion project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
     defaultConfig {
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 23

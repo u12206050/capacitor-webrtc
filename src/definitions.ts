@@ -59,7 +59,7 @@ export interface MediaTrack {
   muted?: boolean;
 }
 
-export interface WebRTCReceiverPlugin {
+export interface CapWebRTCPlugin {
   start(options?: StartOptions): Promise<void>;
   stop(): Promise<void>;
 
