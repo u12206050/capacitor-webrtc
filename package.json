@@ -6,11 +6,22 @@
   "main": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
   "unpkg": "dist/plugin.js",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js"
+    },
+    "./dist/esm/helpers": {
+      "types": "./dist/esm/helpers.d.ts",
+      "import": "./dist/esm/index.js"
+    }
+  },
   "files": [
     "android/",
     "ios/",
     "dist/",
-    "src/"
+    "src/",
+    "CapacitorWebrtc.podspec"
   ],
   "author": "",
   "license": "MIT",
@@ -36,7 +47,7 @@
   ],
   "scripts": {
     "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
-    "verify:ios": "pod spec lint WebRTCReceiver.podspec --allow-warnings --local",
+    "verify:ios": "pod spec lint CapacitorWebrtc.podspec --allow-warnings --local",
     "verify:android": "test -f android/build.gradle && test -f android/src/main/AndroidManifest.xml && echo 'Android structure verified' || (echo 'Android structure incomplete' && exit 1)",
     "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",

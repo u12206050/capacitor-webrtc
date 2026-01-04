@@ -23,10 +23,15 @@
 
 ## iOS Setup
 
-1. **Add WebRTC via CocoaPods**: The plugin's Podspec includes:
+1. **Add WebRTC via CocoaPods**: The plugin uses `WebRTC-lib` from [stasel/WebRTC](https://github.com/stasel/WebRTC), which is a community-maintained distribution that supports both device and simulator architectures.
+
+   **Important**: Your app's `Podfile` must include `use_frameworks!`:
    ```ruby
-   s.dependency 'GoogleWebRTC', '~> 1.1'
+   platform :ios, '14.0'
+   use_frameworks!
+   # ... rest of your Podfile
    ```
+   
    Run `pod install` in your iOS app directory.
 
 2. **Enable Background Audio**: In Xcode:
@@ -72,4 +77,5 @@ See `example-usage.ts` for a complete example of how to use the plugin.
 - Background audio requires the Background Modes capability to be enabled
 - Ensure `AVAudioSession` is configured correctly (done automatically by the plugin)
 - Check that camera/microphone permissions are granted
+- **WebRTC header errors**: Ensure your `Podfile` includes `use_frameworks!` (required for WebRTC-lib dynamic framework)
 

@@ -166,6 +166,13 @@ See the TypeScript definitions in `src/definitions.ts` for full API documentatio
 - **Background audio not working**: Ensure Background Modes capability is enabled
 - **Camera permission denied**: Check Info.plist has NSCameraUsageDescription
 - **Build errors**: Run `pod install` in your iOS app directory
+- **WebRTC header errors**: 
+  - Ensure your app's `Podfile` includes `use_frameworks!` (required for WebRTC-lib):
+    ```ruby
+    platform :ios, '14.0'
+    use_frameworks!
+    # ... rest of your Podfile
+    ```
 
 ## Contributing
 

@@ -12,6 +12,7 @@ public class WebRTCReceiverPlugin: CAPPlugin {
   private var views: [String: RTCMTLVideoView] = [:]
   private var remoteVideoTrack: RTCVideoTrack?
   private var dataChannels: [String: RTCDataChannel] = [:]
+  private var dataChannelDelegates: [String: DataChannelDelegate] = [:]
   private var localTracks: [String: RTCMediaStreamTrack] = [:]
   private var audioSource: RTCAudioSource?
   private var videoSource: RTCVideoSource?
@@ -66,6 +67,7 @@ public class WebRTCReceiverPlugin: CAPPlugin {
     // close data channels
     for (_, channel) in dataChannels { channel.close() }
     dataChannels.removeAll()
+    dataChannelDelegates.removeAll()
 
     pc?.close()
     pc = nil
@@ -139,8 +141,13 @@ public class WebRTCReceiverPlugin: CAPPlugin {
     let sdpMLineIndex = call.getInt("sdpMLineIndex") ?? 0
 
     let ice = RTCIceCandidate(sdp: cand, sdpMLineIndex: Int32(sdpMLineIndex), sdpMid: sdpMid)
-    pc.add(ice)
-    call.resolve()
+    pc.add(ice) { error in
+      if let error = error {
+        call.reject(error.localizedDescription)
+      } else {
+        call.resolve()
+      }
+    }
   }
 
   @objc func setSpeakerphoneOn(_ call: CAPPluginCall) {
@@ -381,7 +388,9 @@ public class WebRTCReceiverPlugin: CAPPlugin {
   private func configureAudioSession() {
     let session = AVAudioSession.sharedInstance()
     do {
-      try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
+      try session.setCategory(.playAndRecord, mode: .voiceChat, options: [
+        .allowBluetoothHFP, .allowBluetoothA2DP
+      ])
       try session.setActive(true)
     } catch {
       // If this fails, background audio may not work reliably
@@ -408,7 +417,7 @@ public class WebRTCReceiverPlugin: CAPPlugin {
     let ordered = call.getBool("ordered") ?? true
     let maxPacketLifeTime = call.getInt("maxPacketLifeTime")
     let maxRetransmits = call.getInt("maxRetransmits")
-    let protocol = call.getString("protocol")
+    let proto = call.getString("protocol")
     let negotiated = call.getBool("negotiated") ?? false
     let id = call.getInt("id")
     
@@ -420,19 +429,23 @@ public class WebRTCReceiverPlugin: CAPPlugin {
     if let maxRetransmits = maxRetransmits {
       config.maxRetransmits = Int32(maxRetransmits)
     }
-    if let protocol = protocol {
-      config.protocol = protocol
+    if let proto = proto {
+      config.protocol = proto
     }
     config.isNegotiated = negotiated
     if let id = id {
       config.channelId = Int32(id)
     }
     
-    let channel = pc.createDataChannel(withLabel: label, configuration: config)
+    guard let channel = pc.dataChannel(forLabel: label, configuration: config) else {
+      return call.reject("Failed to create data channel")
+    }
     
     let channelId = label
     dataChannels[channelId] = channel
-    channel.delegate = DataChannelDelegate(plugin: self, channelId: channelId)
+    let delegate = DataChannelDelegate(plugin: self, channelId: channelId)
+    dataChannelDelegates[channelId] = delegate
+    channel.delegate = delegate
     
     call.resolve(["channelId": channelId])
   }
@@ -444,41 +457,60 @@ public class WebRTCReceiverPlugin: CAPPlugin {
     guard let channel = dataChannels[channelId] else {
       return call.reject("Unknown channelId")
     }
-    
+
     let binary = call.getBool("binary") ?? false
-    guard let data = call.get("data") else {
-      return call.reject("Missing data")
-    }
-    
-    do {
-      if binary {
-        // Handle binary data - expect base64 string or array of numbers
-        let bytes: Data
-        if let base64String = data as? String {
-          guard let decoded = Data(base64Encoded: base64String) else {
-            return call.reject("Invalid base64 string")
-          }
-          bytes = decoded
-        } else if let array = data as? [Int] {
-          bytes = Data(array.map { UInt8($0) })
-        } else {
-          return call.reject("Invalid binary data format")
+
+    // Extract input in supported ways (string, array, or object)
+    var payloadData: Data?
+
+    if binary {
+      // Expect base64 string or array of numbers for binary
+      if let base64String = call.getString("data") {
+        payloadData = Data(base64Encoded: base64String)
+        if payloadData == nil {
+          return call.reject("Invalid base64 string")
         }
-        let buffer = RTCDataBuffer(data: bytes, isBinary: true)
-        channel.sendData(buffer)
-      } else {
-        // Text data
-        let text = (data as? String) ?? String(describing: data)
-        guard let textData = text.data(using: .utf8) else {
+      } else if let numberArray = call.getArray("data") as? [Int] {
+        payloadData = Data(numberArray.map { UInt8($0 & 0xFF) })
+      } else if let obj = call.getObject("data") { // try object with `base64` field
+        if let base64String = obj["base64"] as? String, let decoded = Data(base64Encoded: base64String) {
+          payloadData = decoded
+        }
+      }
+
+      guard let bytes = payloadData else {
+        return call.reject("Missing data")
+      }
+
+      let buffer = RTCDataBuffer(data: bytes, isBinary: true)
+      channel.sendData(buffer)
+    } else {
+      // Text mode: accept string; if array/object provided, stringify it
+      if let text = call.getString("data") {
+        guard let textData = text.data(using: String.Encoding.utf8) else {
           return call.reject("Failed to encode text data")
         }
         let buffer = RTCDataBuffer(data: textData, isBinary: false)
         channel.sendData(buffer)
+      } else if let arr = call.getArray("data") {
+        let text = String(describing: arr)
+        guard let textData = text.data(using: String.Encoding.utf8) else {
+          return call.reject("Failed to encode text data")
+        }
+        let buffer = RTCDataBuffer(data: textData, isBinary: false)
+        channel.sendData(buffer)
+      } else if let obj = call.getObject("data") {
+        let text = String(describing: obj)
+        guard let textData = text.data(using: String.Encoding.utf8) else {
+          return call.reject("Failed to encode text data")
+        }
+        let buffer = RTCDataBuffer(data: textData, isBinary: false)
+        channel.sendData(buffer)
+      } else {
+        return call.reject("Missing data")
       }
-      call.resolve()
-    } catch {
-      call.reject("Failed to send data: \(error.localizedDescription)")
     }
+    call.resolve()
   }
 
   @objc func closeDataChannel(_ call: CAPPluginCall) {
@@ -489,6 +521,7 @@ public class WebRTCReceiverPlugin: CAPPlugin {
       return call.resolve()
     }
     channel.close()
+    dataChannelDelegates.removeValue(forKey: channelId)
     call.resolve()
   }
 }
@@ -575,7 +608,9 @@ extension WebRTCReceiverPlugin: RTCPeerConnectionDelegate {
   public func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
     let channelId = dataChannel.label
     dataChannels[channelId] = dataChannel
-    dataChannel.delegate = DataChannelDelegate(plugin: self, channelId: channelId)
+    let delegate = DataChannelDelegate(plugin: self, channelId: channelId)
+    dataChannelDelegates[channelId] = delegate
+    dataChannel.delegate = delegate
     
     notifyListeners("dataChannel", data: [
       "channelId": channelId,

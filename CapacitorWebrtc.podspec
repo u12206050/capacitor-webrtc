@@ -3,7 +3,7 @@ require 'json'
 package = JSON.parse(File.read(File.join(__dir__, 'package.json')))
 
 Pod::Spec.new do |s|
-  s.name = 'WebRTCReceiver'
+  s.name = 'CapacitorWebrtc'
   s.version = package['version']
   s.summary = package['description']&.slice(0, 140) || 'Capacitor plugin for WebRTC support with native video rendering'
   s.license = package['license']
@@ -18,7 +18,20 @@ Pod::Spec.new do |s|
   s.source_files = 'ios/Plugin/**/*.{swift,h,m,c,cc,mm,cpp}'
   s.ios.deployment_target  = '14.0'
   s.dependency 'Capacitor'
-  s.dependency 'GoogleWebRTC', '~> 1.1'
+  # Using WebRTC-lib from stasel/WebRTC (community-maintained, supports simulator)
+  # This replaces deprecated GoogleWebRTC CocoaPod
+  # Using M140 to avoid header issues in later versions
+  # Note: Consuming app's Podfile must include 'use_frameworks!'
+  s.dependency 'WebRTC-lib', '140.0.0'
   s.swift_version = '5.1'
+  
+  # Build settings to help with WebRTC-lib header resolution
+  # WebRTC-lib uses xcframework format, headers are in the framework bundle
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
+    'CLANG_ENABLE_MODULES' => 'YES',
+    'SWIFT_INCLUDE_PATHS' => '$(inherited) ${PODS_CONFIGURATION_BUILD_DIR}/WebRTC-lib'
+  }
 end
 
