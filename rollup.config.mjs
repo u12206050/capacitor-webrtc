@@ -1,0 +1,49 @@
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import typescript from '@rollup/plugin-typescript';
+
+export default [
+  {
+    input: 'src/index.ts',
+    output: {
+      file: 'dist/plugin.js',
+      format: 'iife',
+      name: 'capacitorWebRTCReceiver',
+      globals: {
+        '@capacitor/core': 'capacitorExports',
+      },
+      sourcemap: true,
+      inlineDynamicImports: true,
+    },
+    external: ['@capacitor/core'],
+    plugins: [
+      nodeResolve({
+        browser: true,
+      }),
+      typescript({
+        tsconfig: './tsconfig.json',
+        declaration: false,
+      }),
+    ],
+  },
+  {
+    input: 'src/index.ts',
+    output: {
+      file: 'dist/esm/index.js',
+      format: 'es',
+      sourcemap: true,
+      inlineDynamicImports: true,
+    },
+    external: ['@capacitor/core'],
+    plugins: [
+      nodeResolve({
+        browser: true,
+      }),
+      typescript({
+        tsconfig: './tsconfig.json',
+        declaration: true,
+        declarationDir: './dist/esm',
+      }),
+    ],
+  },
+];
+

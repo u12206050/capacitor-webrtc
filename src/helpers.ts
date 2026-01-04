@@ -1,4 +1,13 @@
-import { WebRTCReceiver } from './index';
+import { registerPlugin } from '@capacitor/core';
+
+import type { WebRTCReceiverPlugin } from './definitions';
+
+// Create plugin instance here to avoid circular dependency with index.ts
+// This is safe because registerPlugin is idempotent - calling it multiple times
+// with the same name returns the same instance
+const WebRTCReceiver = registerPlugin<WebRTCReceiverPlugin>('WebRTCReceiver', {
+  web: () => import('./web').then(m => new m.WebRTCReceiverWeb()),
+});
 
 export async function attachNativeVideoToElement(
   el: HTMLElement,
