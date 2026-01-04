@@ -26,7 +26,7 @@ export interface CreateVideoViewOptions {
   mode?: 'fit' | 'fill'; // default 'fit'
 }
 
-export interface UpdateVideoViewOptions extends Partial<CreateVideoViewOptions> {}
+export type UpdateVideoViewOptions = Partial<CreateVideoViewOptions>
 
 export interface CreateDataChannelOptions {
   label: string;
@@ -89,8 +89,8 @@ export interface WebRTCReceiverPlugin {
   getTracks(): Promise<{ tracks: MediaTrack[] }>;
   setTrackEnabled(options: { trackId: string; enabled: boolean }): Promise<void>;
   switchCamera(): Promise<void>; // Switch between front/back camera
-  getAudioInputDevices(): Promise<{ devices: Array<{ deviceId: string; label: string }> }>;
-  getVideoInputDevices(): Promise<{ devices: Array<{ deviceId: string; label: string }> }>;
+  getAudioInputDevices(): Promise<{ devices: { deviceId: string; label: string }[] }>;
+  getVideoInputDevices(): Promise<{ devices: { deviceId: string; label: string }[] }>;
 
   // Event listeners
   addListener(
