@@ -68,10 +68,10 @@ Here are the specific fixes I recommend:
    ```json
    "repository": {
      "type": "git",
-     "url": "https://github.com/yourusername/capacitor-webrtc-receiver.git"
+     "url": "https://github.com/yourusername/capacitor-webrtc.git"
    },
    "bugs": {
-     "url": "https://github.com/yourusername/capacitor-webrtc-receiver/issues"
+     "url": "https://github.com/yourusername/capacitor-webrtc/issues"
    }
    ```
 

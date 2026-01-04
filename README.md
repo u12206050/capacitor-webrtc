@@ -1,4 +1,4 @@
-# capacitor-webrtc-receiver
+# capacitor-webrtc
 
 Capacitor plugin for WebRTC support with native video rendering. Supports both sending and receiving media.
 
@@ -19,15 +19,15 @@ Capacitor plugin for WebRTC support with native video rendering. Supports both s
 ## Installation
 
 ```bash
-npm install capacitor-webrtc-receiver
+npm install capacitor-webrtc
 npx cap sync
 ```
 
 ## Usage
 
 ```typescript
-import { WebRTCReceiver } from 'capacitor-webrtc-receiver';
-import { attachNativeVideoToElement } from 'capacitor-webrtc-receiver/dist/esm/helpers';
+import { WebRTCReceiver } from 'capacitor-webrtc';
+import { attachNativeVideoToElement } from 'capacitor-webrtc/dist/esm/helpers';
 
 // Listen for plugin events
 WebRTCReceiver.addListener('iceCandidate', (cand) => {

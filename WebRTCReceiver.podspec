@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   repo_url = package.dig('repository', 'url')
   if repo_url.nil? || repo_url.empty?
     # Fallback for local development/validation
-    repo_url = 'https://github.com/capacitor-community/capacitor-webrtc-receiver'
+    repo_url = 'https://github.com/capacitor-community/capacitor-webrtc'
   end
   s.homepage = repo_url
   s.author = package['author'] || ''
