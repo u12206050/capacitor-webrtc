@@ -1,23 +1,29 @@
-import { registerPlugin } from '@capacitor/core';
-
 import type { CapWebRTCPlugin } from './definitions';
 
-// Create plugin instance here to avoid circular dependency with index.ts
-// This is safe because registerPlugin is idempotent - calling it multiple times
-// with the same name returns the same instance
-const CapWebRTC = registerPlugin<CapWebRTCPlugin>('CapWebRTC', {
-  web: () => import('./web').then(m => new m.CapWebRTCWeb()),
-});
+// Lazy getter for the plugin instance to avoid circular dependency with index.ts
+// The plugin is registered in index.ts, and we import it lazily when needed
+let pluginInstance: CapWebRTCPlugin | null = null;
+
+const getCapWebRTC = async (): Promise<CapWebRTCPlugin> => {
+  if (!pluginInstance) {
+    // Dynamic import to avoid circular dependency - by the time this runs,
+    // index.ts will have already registered the plugin
+    const module = await import('./index');
+    pluginInstance = module.CapWebRTC;
+  }
+  return pluginInstance;
+};
 
 export async function attachNativeVideoToElement(
   el: HTMLElement,
   opts?: { mode?: 'fit' | 'fill' }
 ): Promise<{ viewId: string; refresh: () => Promise<void>; destroy: () => Promise<void> }> {
+  const plugin = await getCapWebRTC();
   const rect = el.getBoundingClientRect();
 
   // Capacitor coordinates are in CSS pixels; on iOS you may need to account for safe areas;
   // this is "good enough" for most apps and can be refined.
-  const { viewId } = await CapWebRTC.createVideoView({
+  const { viewId } = await plugin.createVideoView({
     x: Math.round(rect.left),
     y: Math.round(rect.top),
     width: Math.round(rect.width),
@@ -27,7 +33,8 @@ export async function attachNativeVideoToElement(
 
   const refresh = async () => {
     const r = el.getBoundingClientRect();
-    await CapWebRTC.updateVideoView({
+    const p = await getCapWebRTC();
+    await p.updateVideoView({
       viewId,
       x: Math.round(r.left),
       y: Math.round(r.top),
@@ -37,7 +44,8 @@ export async function attachNativeVideoToElement(
   };
 
   const destroy = async () => {
-    await CapWebRTC.destroyVideoView({ viewId });
+    const p = await getCapWebRTC();
+    await p.destroyVideoView({ viewId });
   };
 
   return { viewId, refresh, destroy };
