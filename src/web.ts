@@ -17,14 +17,20 @@ interface VideoView {
   videoElement: HTMLVideoElement;
   container: HTMLElement;
   stream: MediaStream | null;
+  targetElement?: HTMLElement; // For web: the original element to attach stream to
 }
 
 export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
   // addListener and removeAllListeners are inherited from WebPlugin
   // notifyListeners is also inherited from WebPlugin
-  
+
   async addListener(
-    eventName: 'iceCandidate' | 'connectionState' | 'dataChannel' | 'dataChannelMessage' | 'dataChannelState',
+    eventName:
+      | 'iceCandidate'
+      | 'connectionState'
+      | 'dataChannel'
+      | 'dataChannelMessage'
+      | 'dataChannelState',
     listenerFunc: (data: any) => void
   ): Promise<any> {
     return super.addListener(eventName, listenerFunc);
@@ -49,8 +55,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
 
   async start(options?: StartOptions): Promise<void> {
     // Convert iceServers to RTCIceServer format
-    this.iceServers = (options?.iceServers || []).map(server => {
-      const urls = typeof server.urls === 'string' ? [server.urls] : server.urls;
+    this.iceServers = (options?.iceServers || []).map((server) => {
+      const urls =
+        typeof server.urls === 'string' ? [server.urls] : server.urls;
       return {
         urls,
         username: server.username,
@@ -61,9 +68,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     // Create peer connection
     const config: RTCConfiguration = {
       iceServers: this.iceServers,
+      // sdpSemantics is supported but not in all type definitions
+      ...({ sdpSemantics: 'unified-plan' } as any),
     };
-    // @ts-ignore - sdpSemantics is supported but not in all type definitions
-    config.sdpSemantics = 'unified-plan';
     this.pc = new RTCPeerConnection(config);
 
     // Set up event handlers
@@ -90,10 +97,10 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       if (stream) {
         const streamId = stream.id;
         this.remoteStreams.set(streamId, stream);
-        
-        // Attach to all video views
+
+        // Attach to all video views that don't have a stream yet
         this.videoViews.forEach((view) => {
-          if (view.videoElement && !view.stream) {
+          if (view.videoElement && !view.videoElement.srcObject) {
             view.videoElement.srcObject = stream;
             view.stream = stream;
           }
@@ -106,7 +113,7 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       const channelId = channel.label;
       this.dataChannels.set(channelId, channel);
 
-        this.notify('dataChannel', {
+      this.notify('dataChannel', {
         channelId,
         label: channel.label,
       });
@@ -138,7 +145,8 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
         this.notify('dataChannelMessage', {
           channelId,
           data,
-          binary: event.data instanceof ArrayBuffer || event.data instanceof Blob,
+          binary:
+            event.data instanceof ArrayBuffer || event.data instanceof Blob,
         });
       };
 
@@ -251,40 +259,107 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       throw new Error('PeerConnection not started');
     }
 
+    // Check if remote description is set - candidates can only be added after remote description
+    if (!this.pc.remoteDescription) {
+      console.warn('Cannot add ICE candidate: remote description not set yet');
+      return;
+    }
+
+    // Check connection state - can't add candidates if connection is closed/failed
+    if (
+      this.pc.connectionState === 'closed' ||
+      this.pc.connectionState === 'failed'
+    ) {
+      console.warn('Cannot add ICE candidate: connection is closed or failed');
+      return;
+    }
+
     const iceCandidate: RTCIceCandidateInit = {
       candidate: cand.candidate,
     };
-    if (cand.sdpMid) {
+
+    // For web, prefer sdpMLineIndex over sdpMid for better compatibility
+    // Some browsers are strict about sdpMid format matching exactly
+    // If sdpMLineIndex is available, use it; otherwise try sdpMid
+    if (cand.sdpMLineIndex !== undefined && cand.sdpMLineIndex !== null) {
+      iceCandidate.sdpMLineIndex = cand.sdpMLineIndex;
+      // Only include sdpMid if it's a simple numeric string or matches expected format
+      // Skip 'audio0', 'video0' style strings as they may not match browser expectations
+      if (cand.sdpMid && /^\d+$/.test(cand.sdpMid)) {
+        iceCandidate.sdpMid = cand.sdpMid;
+      }
+    } else if (cand.sdpMid) {
+      // Fallback to sdpMid if sdpMLineIndex is not available
       iceCandidate.sdpMid = cand.sdpMid;
     }
-    if (cand.sdpMLineIndex !== undefined) {
-      iceCandidate.sdpMLineIndex = cand.sdpMLineIndex;
+
+    try {
+      await this.pc.addIceCandidate(new RTCIceCandidate(iceCandidate));
+    } catch (error) {
+      // Some ICE candidates may fail if the connection state has changed
+      // or if the candidate is invalid - this is often non-fatal
+      // Don't throw to allow other candidates to be processed
+      console.warn('Failed to add ICE candidate (non-fatal):', error, {
+        candidate: cand.candidate.substring(0, 50) + '...',
+        sdpMid: cand.sdpMid,
+        sdpMLineIndex: cand.sdpMLineIndex,
+        connectionState: this.pc.connectionState,
+        hasRemoteDescription: !!this.pc.remoteDescription,
+      });
     }
-    await this.pc.addIceCandidate(new RTCIceCandidate(iceCandidate));
   }
 
-  async createVideoView(options: CreateVideoViewOptions): Promise<{ viewId: string }> {
+  async createVideoView(
+    options: CreateVideoViewOptions
+  ): Promise<{ viewId: string }> {
     const viewId = `video_view_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    // Create video element
-    const videoElement = document.createElement('video');
-    videoElement.autoplay = true;
-    videoElement.playsInline = true;
-    videoElement.style.position = 'fixed';
-    videoElement.style.left = `${options.x ?? 0}px`;
-    videoElement.style.top = `${options.y ?? 0}px`;
-    videoElement.style.width = `${options.width ?? 100}px`;
-    videoElement.style.height = `${options.height ?? 100}px`;
-    videoElement.style.zIndex = '999999';
-    videoElement.style.objectFit = options.mode === 'fill' ? 'cover' : 'contain';
-    videoElement.style.backgroundColor = '#000';
 
-    // Create container
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.pointerEvents = 'none';
-    container.appendChild(videoElement);
-    document.body.appendChild(container);
+    // On web, if a target element is provided, use it directly
+    const targetElement = (options as any).targetElement as
+      | HTMLElement
+      | undefined;
+    let videoElement: HTMLVideoElement;
+    let container: HTMLElement;
+
+    if (targetElement) {
+      // If target is already a video element, use it directly
+      if (targetElement instanceof HTMLVideoElement) {
+        videoElement = targetElement;
+        container = targetElement.parentElement || document.body;
+      } else {
+        // Create video element and append to target container
+        videoElement = document.createElement('video');
+        videoElement.autoplay = true;
+        videoElement.playsInline = true;
+        videoElement.style.width = '100%';
+        videoElement.style.height = '100%';
+        videoElement.style.objectFit =
+          options.mode === 'fill' ? 'cover' : 'contain';
+        targetElement.appendChild(videoElement);
+        container = targetElement;
+      }
+    } else {
+      // Create overlay video element (native-like behavior for cases without target element)
+      videoElement = document.createElement('video');
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.style.position = 'fixed';
+      videoElement.style.left = `${options.x ?? 0}px`;
+      videoElement.style.top = `${options.y ?? 0}px`;
+      videoElement.style.width = `${options.width ?? 100}px`;
+      videoElement.style.height = `${options.height ?? 100}px`;
+      videoElement.style.zIndex = '999999';
+      videoElement.style.objectFit =
+        options.mode === 'fill' ? 'cover' : 'contain';
+      videoElement.style.backgroundColor = '#000';
+
+      // Create container
+      container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.pointerEvents = 'none';
+      container.appendChild(videoElement);
+      document.body.appendChild(container);
+    }
 
     // Attach any existing remote stream
     if (this.remoteStreams.size > 0) {
@@ -296,31 +371,38 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       videoElement,
       container,
       stream: videoElement.srcObject as MediaStream | null,
+      targetElement,
     });
 
     return { viewId };
   }
 
-  async updateVideoView(options: UpdateVideoViewOptions & { viewId: string }): Promise<void> {
+  async updateVideoView(
+    options: UpdateVideoViewOptions & { viewId: string }
+  ): Promise<void> {
     const view = this.videoViews.get(options.viewId);
     if (!view) {
       throw new Error('Unknown viewId');
     }
 
-    if (options.x !== undefined) {
-      view.videoElement.style.left = `${options.x}px`;
-    }
-    if (options.y !== undefined) {
-      view.videoElement.style.top = `${options.y}px`;
-    }
-    if (options.width !== undefined) {
-      view.videoElement.style.width = `${options.width}px`;
-    }
-    if (options.height !== undefined) {
-      view.videoElement.style.height = `${options.height}px`;
+    // If attached to a target element, don't update position (it's managed by the element)
+    if (!view.targetElement) {
+      if (options.x !== undefined) {
+        view.videoElement.style.left = `${options.x}px`;
+      }
+      if (options.y !== undefined) {
+        view.videoElement.style.top = `${options.y}px`;
+      }
+      if (options.width !== undefined) {
+        view.videoElement.style.width = `${options.width}px`;
+      }
+      if (options.height !== undefined) {
+        view.videoElement.style.height = `${options.height}px`;
+      }
     }
     if (options.mode !== undefined) {
-      view.videoElement.style.objectFit = options.mode === 'fill' ? 'cover' : 'contain';
+      view.videoElement.style.objectFit =
+        options.mode === 'fill' ? 'cover' : 'contain';
     }
   }
 
@@ -331,13 +413,24 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     }
 
     if (view.videoElement.srcObject) {
-      const stream = view.videoElement.srcObject as MediaStream;
       // Don't stop the stream, just remove the reference
       view.videoElement.srcObject = null;
     }
 
-    view.container.removeChild(view.videoElement);
-    document.body.removeChild(view.container);
+    // If attached to a target element, just remove the video element
+    // Otherwise remove the overlay container
+    if (view.targetElement && view.targetElement !== view.videoElement) {
+      if (view.videoElement.parentElement) {
+        view.videoElement.parentElement.removeChild(view.videoElement);
+      }
+    } else {
+      if (view.container.contains(view.videoElement)) {
+        view.container.removeChild(view.videoElement);
+      }
+      if (view.container.parentElement) {
+        view.container.parentElement.removeChild(view.container);
+      }
+    }
     this.videoViews.delete(options.viewId);
   }
 
@@ -351,7 +444,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     // No-op on web
   }
 
-  async createDataChannel(options: CreateDataChannelOptions): Promise<{ channelId: string }> {
+  async createDataChannel(
+    options: CreateDataChannelOptions
+  ): Promise<{ channelId: string }> {
     if (!this.pc) {
       throw new Error('PeerConnection not started');
     }
@@ -387,7 +482,7 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
         data = btoa(String.fromCharCode(...bytes));
       } else if (event.data instanceof Blob) {
         const reader = new FileReader();
-          reader.onloadend = () => {
+        reader.onloadend = () => {
           const base64 = (reader.result as string).split(',')[1];
           this.notify('dataChannelMessage', {
             channelId,
@@ -408,12 +503,12 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       });
     };
 
-      channel.addEventListener('statechange', () => {
-        this.notify('dataChannelState', {
-          channelId,
-          state: channel.readyState,
-        });
+    channel.addEventListener('statechange', () => {
+      this.notify('dataChannelState', {
+        channelId,
+        state: channel.readyState,
       });
+    });
 
     return { channelId };
   }
@@ -446,7 +541,8 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       }
       channel.send(data);
     } else {
-      const text = typeof options.data === 'string' ? options.data : String(options.data);
+      const text =
+        typeof options.data === 'string' ? options.data : String(options.data);
       channel.send(text);
     }
   }
@@ -461,7 +557,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     this.dataChannels.delete(options.channelId);
   }
 
-  async getUserMedia(options?: GetUserMediaOptions): Promise<{ tracks: MediaTrack[] }> {
+  async getUserMedia(
+    options?: GetUserMediaOptions
+  ): Promise<{ tracks: MediaTrack[] }> {
     const constraints: MediaStreamConstraints = {
       audio: options?.audio !== false,
       video: options?.video !== false,
@@ -560,7 +658,10 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     return { tracks };
   }
 
-  async setTrackEnabled(options: { trackId: string; enabled: boolean }): Promise<void> {
+  async setTrackEnabled(options: {
+    trackId: string;
+    enabled: boolean;
+  }): Promise<void> {
     const track = this.localTracks.get(options.trackId);
     if (!track) {
       throw new Error('Unknown trackId');
@@ -581,7 +682,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
 
     // Get available video devices
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter((device) => device.kind === 'videoinput');
+    const videoDevices = devices.filter(
+      (device) => device.kind === 'videoinput'
+    );
 
     if (videoDevices.length < 2) {
       throw new Error('Only one camera available');
@@ -604,9 +707,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     // Get new stream with next device
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { deviceId: { exact: nextDevice.deviceId } },
-      audio: Array.from(this.localTracks.values())
-        .filter((t) => t.kind === 'audio')
-        .length > 0,
+      audio:
+        Array.from(this.localTracks.values()).filter((t) => t.kind === 'audio')
+          .length > 0,
     });
 
     // Replace video track
@@ -616,7 +719,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
 
     // Update peer connection
     if (this.pc) {
-      const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
+      const sender = this.pc
+        .getSenders()
+        .find((s) => s.track?.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newVideoTrack);
       } else {
@@ -625,7 +730,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     }
   }
 
-  async getAudioInputDevices(): Promise<{ devices: { deviceId: string; label: string }[] }> {
+  async getAudioInputDevices(): Promise<{
+    devices: { deviceId: string; label: string }[];
+  }> {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioDevices = devices
       .filter((device) => device.kind === 'audioinput')
@@ -637,7 +744,9 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
     return { devices: audioDevices };
   }
 
-  async getVideoInputDevices(): Promise<{ devices: { deviceId: string; label: string }[] }> {
+  async getVideoInputDevices(): Promise<{
+    devices: { deviceId: string; label: string }[];
+  }> {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const videoDevices = devices
       .filter((device) => device.kind === 'videoinput')

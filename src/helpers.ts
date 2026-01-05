@@ -1,40 +1,31 @@
 import type { CapWebRTCPlugin } from './definitions';
 
-// Lazy getter for the plugin instance to avoid circular dependency with index.ts
-// The plugin is registered in index.ts, and we import it lazily when needed
-let pluginInstance: CapWebRTCPlugin | null = null;
-
-const getCapWebRTC = async (): Promise<CapWebRTCPlugin> => {
-  if (!pluginInstance) {
-    // Dynamic import to avoid circular dependency - by the time this runs,
-    // index.ts will have already registered the plugin
-    const module = await import('./index');
-    pluginInstance = module.CapWebRTC;
-  }
-  return pluginInstance;
-};
-
 export async function attachNativeVideoToElement(
+  plugin: CapWebRTCPlugin,
   el: HTMLElement,
-  opts?: { mode?: 'fit' | 'fill' }
-): Promise<{ viewId: string; refresh: () => Promise<void>; destroy: () => Promise<void> }> {
-  const plugin = await getCapWebRTC();
+  opts?: { mode?: 'fit' | 'fill' },
+): Promise<{
+  viewId: string;
+  refresh: () => Promise<void>;
+  destroy: () => Promise<void>;
+}> {
   const rect = el.getBoundingClientRect();
 
   // Capacitor coordinates are in CSS pixels; on iOS you may need to account for safe areas;
   // this is "good enough" for most apps and can be refined.
+  // On web, pass the element directly so it can be used instead of creating an overlay
   const { viewId } = await plugin.createVideoView({
     x: Math.round(rect.left),
     y: Math.round(rect.top),
     width: Math.round(rect.width),
     height: Math.round(rect.height),
     mode: opts?.mode ?? 'fit',
-  });
+    targetElement: el, // Pass the element for web implementation
+  } as any);
 
   const refresh = async () => {
     const r = el.getBoundingClientRect();
-    const p = await getCapWebRTC();
-    await p.updateVideoView({
+    await plugin.updateVideoView({
       viewId,
       x: Math.round(r.left),
       y: Math.round(r.top),
@@ -44,10 +35,8 @@ export async function attachNativeVideoToElement(
   };
 
   const destroy = async () => {
-    const p = await getCapWebRTC();
-    await p.destroyVideoView({ viewId });
+    await plugin.destroyVideoView({ viewId });
   };
 
   return { viewId, refresh, destroy };
 }
-

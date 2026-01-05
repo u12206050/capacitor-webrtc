@@ -27,7 +27,7 @@ CapWebRTC.addListener('connectionState', (ev) => {
 
 async function start() {
   const remoteDiv = document.getElementById('remoteVideo')!;
-  viewHandle = await attachNativeVideoToElement(remoteDiv, { mode: 'fit' });
+  viewHandle = await attachNativeVideoToElement(CapWebRTC, remoteDiv, { mode: 'fit' });
 
   // Keep overlay aligned if layout changes
   window.addEventListener('resize', () => viewHandle?.refresh());

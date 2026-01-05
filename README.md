@@ -41,7 +41,7 @@ CapWebRTC.addListener('connectionState', (ev) => {
 
 // Start WebRTC session
 const remoteDiv = document.getElementById('remoteVideo')!;
-const viewHandle = await attachNativeVideoToElement(remoteDiv, { mode: 'fit' });
+const viewHandle = await attachNativeVideoToElement(CapWebRTC, remoteDiv, { mode: 'fit' });
 
 await CapWebRTC.start({
   enableBackgroundAudio: true,
