@@ -255,11 +255,51 @@ class CapWebRTCPlugin : Plugin() {
   @PluginMethod
   fun addIceCandidate(call: PluginCall) {
     val candidate = call.getString("candidate") ?: return call.reject("Missing candidate")
+    val pc = pc ?: return call.reject("PeerConnection not started")
+    
+    // Check if remote description is set - candidates can only be added after remote description
+    if (pc.remoteDescription() == null) {
+      // Don't reject, just silently skip - this is often non-fatal
+      return call.resolve()
+    }
+    
+    // Check connection state - can't add candidates if connection is closed/failed
+    val connectionState = pc.connectionState()
+    if (connectionState == PeerConnection.PeerConnectionState.CLOSED || 
+        connectionState == PeerConnection.PeerConnectionState.FAILED) {
+      return call.resolve()
+    }
+    
     val sdpMid = call.getString("sdpMid")
-    val sdpMLineIndex = call.getInt("sdpMLineIndex") ?: 0
-    val ice = IceCandidate(sdpMid, sdpMLineIndex, candidate)
-    pc?.addIceCandidate(ice)
-    call.resolve()
+    val sdpMLineIndex = call.getInt("sdpMLineIndex")
+    
+    // For Android, prefer sdpMLineIndex over sdpMid for better compatibility
+    // Only use sdpMid if it's a numeric string (not 'audio0', 'video0' style)
+    val finalSdpMid: String? = if (sdpMLineIndex != null) {
+      // If sdpMLineIndex is available, only use sdpMid if it's numeric
+      if (sdpMid != null && sdpMid.matches(Regex("^\\d+$"))) {
+        sdpMid
+      } else {
+        null
+      }
+    } else {
+      // Fallback to sdpMid if sdpMLineIndex is not available
+      sdpMid
+    }
+    
+    val finalSdpMLineIndex = sdpMLineIndex ?: 0
+    
+    try {
+      val ice = IceCandidate(finalSdpMid, finalSdpMLineIndex, candidate)
+      pc.addIceCandidate(ice)
+      call.resolve()
+    } catch (e: Exception) {
+      // Don't reject - log as warning and resolve to allow other candidates to be processed
+      // ICE candidate errors are often non-fatal
+      // Logging commented out to reduce noise - uncomment for debugging
+      // android.util.Log.w("CapWebRTC", "Failed to add ICE candidate (non-fatal): ${e.message}")
+      call.resolve()
+    }
   }
 
   @PluginMethod

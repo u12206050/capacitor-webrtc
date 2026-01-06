@@ -137,13 +137,45 @@ public class CapWebRTCPlugin: CAPPlugin {
   @objc func addIceCandidate(_ call: CAPPluginCall) {
     guard let pc = pc else { return call.reject("PeerConnection not started") }
     guard let cand = call.getString("candidate") else { return call.reject("Missing candidate") }
+    
+    // Check if remote description is set - candidates can only be added after remote description
+    guard pc.remoteDescription != nil else {
+      // Don't reject, just silently skip - this is often non-fatal
+      return call.resolve()
+    }
+    
+    // Check connection state - can't add candidates if connection is closed/failed
+    if pc.connectionState == .closed || pc.connectionState == .failed {
+      return call.resolve()
+    }
+    
     let sdpMid = call.getString("sdpMid")
-    let sdpMLineIndex = call.getInt("sdpMLineIndex") ?? 0
+    let sdpMLineIndex = call.getInt("sdpMLineIndex")
+    
+    // For iOS, prefer sdpMLineIndex over sdpMid for better compatibility
+    // Only use sdpMid if it's a numeric string (not 'audio0', 'video0' style)
+    var finalSdpMid: String? = nil
+    var finalSdpMLineIndex: Int32 = 0
+    
+    if let sdpMLineIndex = sdpMLineIndex {
+      finalSdpMLineIndex = Int32(sdpMLineIndex)
+      // Only include sdpMid if it's numeric (matches m-line index)
+      if let sdpMid = sdpMid, sdpMid.range(of: "^\\d+$", options: .regularExpression) != nil {
+        finalSdpMid = sdpMid
+      }
+    } else if let sdpMid = sdpMid {
+      // Fallback to sdpMid if sdpMLineIndex is not available
+      finalSdpMid = sdpMid
+    }
 
-    let ice = RTCIceCandidate(sdp: cand, sdpMLineIndex: Int32(sdpMLineIndex), sdpMid: sdpMid)
+    let ice = RTCIceCandidate(sdp: cand, sdpMLineIndex: finalSdpMLineIndex, sdpMid: finalSdpMid)
     pc.add(ice) { error in
       if let error = error {
-        call.reject(error.localizedDescription)
+        // Don't reject - log as warning and resolve to allow other candidates to be processed
+        // ICE candidate errors are often non-fatal
+        // Logging commented out to reduce noise - uncomment for debugging
+        // print("⚠️ Failed to add ICE candidate (non-fatal): \(error.localizedDescription)")
+        call.resolve()
       } else {
         call.resolve()
       }
@@ -167,21 +199,44 @@ public class CapWebRTCPlugin: CAPPlugin {
     let y = CGFloat(call.getInt("y") ?? 0)
     let w = CGFloat(call.getInt("width") ?? 100)
     let h = CGFloat(call.getInt("height") ?? 100)
+    let mode = call.getString("mode") ?? "fit"
 
     DispatchQueue.main.async { [weak self] in
-      guard let self = self, let vcView = self.bridge?.viewController?.view else { return }
+      guard let self = self, let vcView = self.bridge?.viewController?.view else {
+        call.reject("Failed to create video view: view controller not available")
+        return
+      }
       let v = RTCMTLVideoView(frame: CGRect(x: x, y: y, width: w, height: h))
-      v.videoContentMode = .scaleAspectFit
+      v.videoContentMode = (mode == "fill") ? .scaleAspectFill : .scaleAspectFit
       v.backgroundColor = .black
+      v.isEnabled = true
+      v.isHidden = false
       vcView.addSubview(v)
       self.views[viewId] = v
+      print("[CapWebRTC] Created video view \(viewId) with frame: \(v.frame)")
 
+      // Check for existing video track and attach
       if let track = self.remoteVideoTrack {
+        print("[CapWebRTC] Attaching existing video track to new view \(viewId)")
         track.add(v)
+        v.isEnabled = true
+        v.isHidden = false
+      } else {
+        // If no track yet, check transceivers for existing tracks
+        print("[CapWebRTC] No video track yet, checking transceivers for view \(viewId)")
+        self.checkForExistingVideoTracks()
+        if let track = self.remoteVideoTrack {
+          print("[CapWebRTC] Found video track after checking, attaching to view \(viewId)")
+          track.add(v)
+          v.isEnabled = true
+          v.isHidden = false
+        } else {
+          print("[CapWebRTC] No video track found after checking transceivers")
+        }
       }
+      
+      call.resolve(["viewId": viewId])
     }
-
-    call.resolve(["viewId": viewId])
   }
 
   @objc func updateVideoView(_ call: CAPPluginCall) {
@@ -576,7 +631,70 @@ extension CapWebRTCPlugin: RTCPeerConnectionDelegate {
   public func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
 
   public func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCPeerConnectionState) {
-    notifyListeners("connectionState", data: ["state": "\(newState)"])
+    let stateString: String
+    switch newState {
+    case .new:
+      stateString = "new"
+    case .connecting:
+      stateString = "connecting"
+    case .connected:
+      stateString = "connected"
+      // When connected, check for existing video tracks in transceivers
+      // This handles cases where tracks arrive before delegate methods are called
+      DispatchQueue.main.async { [weak self] in
+        self?.checkForExistingVideoTracks()
+      }
+    case .disconnected:
+      stateString = "disconnected"
+    case .failed:
+      stateString = "failed"
+    case .closed:
+      stateString = "closed"
+    @unknown default:
+      stateString = "unknown"
+    }
+    notifyListeners("connectionState", data: ["state": stateString])
+  }
+  
+  private func checkForExistingVideoTracks() {
+    guard let pc = pc else { return }
+    print("[CapWebRTC] Checking for existing video tracks in \(pc.transceivers.count) transceivers")
+    // Check all transceivers for video tracks
+    for (index, transceiver) in pc.transceivers.enumerated() {
+      let track = transceiver.receiver.track
+      let mediaType = transceiver.mediaType
+      print("[CapWebRTC] Transceiver \(index): mediaType = \(mediaType), track kind = \(track?.kind ?? "nil"), trackId = \(track?.trackId ?? "nil"), direction = \(transceiver.direction)")
+      
+      // Check both mediaType and track type for video
+      if mediaType == .video || track?.kind == "video" {
+        if let videoTrack = track as? RTCVideoTrack {
+          print("[CapWebRTC] ✅ Found video track: \(videoTrack.trackId)")
+          let shouldUpdate = remoteVideoTrack == nil || remoteVideoTrack?.trackId != videoTrack.trackId
+          if shouldUpdate {
+            print("[CapWebRTC] Setting remoteVideoTrack")
+            remoteVideoTrack = videoTrack
+          } else {
+            print("[CapWebRTC] Video track already set, but ensuring it's attached to all views")
+          }
+          // Always attach to all existing views, even if track was already set
+          // This handles cases where views were created after the track was set
+          DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            print("[CapWebRTC] Attaching video track to \(self.views.count) views")
+            for (viewId, v) in self.views {
+              print("[CapWebRTC] Adding video track to view \(viewId)")
+              videoTrack.add(v)
+            }
+          }
+        } else if track != nil {
+          print("[CapWebRTC] ⚠️ Transceiver \(index) has video mediaType but track is not RTCVideoTrack: \(type(of: track!))")
+        } else {
+          print("[CapWebRTC] ⚠️ Transceiver \(index) has video mediaType but no track")
+        }
+      } else if track != nil {
+        print("[CapWebRTC] Transceiver \(index) has non-video track: kind=\(track!.kind), type=\(type(of: track!))")
+      }
+    }
   }
 
   public func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {}
@@ -593,15 +711,58 @@ extension CapWebRTCPlugin: RTCPeerConnectionDelegate {
   public func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
 
   public func peerConnection(_ peerConnection: RTCPeerConnection,
-                             didStartReceivingOn transceiver: RTCRtpTransceiver) {}
+                             didStartReceivingOn transceiver: RTCRtpTransceiver) {
+    let track = transceiver.receiver.track
+    print("[CapWebRTC] didStartReceivingOn: track kind = \(track?.kind ?? "nil"), trackId = \(track?.trackId ?? "nil"), mediaType = \(transceiver.mediaType)")
+    
+    // Handle video track from transceiver (unified-plan)
+    if let videoTrack = track as? RTCVideoTrack {
+      print("[CapWebRTC] ✅ Video track received via didStartReceivingOn: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled), state: \(videoTrack.readyState)")
+      remoteVideoTrack = videoTrack
+      // Attach to existing views
+      DispatchQueue.main.async { [weak self] in
+        guard let self = self else { return }
+        print("[CapWebRTC] Attaching video track to \(self.views.count) existing views")
+        for (viewId, v) in self.views {
+          print("[CapWebRTC] Adding video track to view \(viewId), view frame: \(v.frame), enabled: \(v.isEnabled), hidden: \(v.isHidden)")
+          videoTrack.add(v)
+          // Ensure view is visible and enabled
+          v.isEnabled = true
+          v.isHidden = false
+        }
+      }
+    } else if let audioTrack = track as? RTCAudioTrack {
+      print("[CapWebRTC] ✅ Audio track received via didStartReceivingOn: \(audioTrack.trackId)")
+    } else if track != nil {
+      print("[CapWebRTC] ⚠️ Unknown track type: \(type(of: track!))")
+    }
+  }
 
   public func peerConnection(_ peerConnection: RTCPeerConnection,
                              didAdd rtpReceiver: RTCRtpReceiver,
                              streams: [RTCMediaStream]) {
-    if let track = rtpReceiver.track as? RTCVideoTrack {
-      remoteVideoTrack = track
+    let track = rtpReceiver.track
+    print("[CapWebRTC] didAdd rtpReceiver: track kind = \(track?.kind ?? "nil"), trackId = \(track?.trackId ?? "nil"), streams count = \(streams.count)")
+    
+    if let videoTrack = track as? RTCVideoTrack {
+      print("[CapWebRTC] ✅ Video track received via didAdd rtpReceiver: \(videoTrack.trackId), enabled: \(videoTrack.isEnabled), state: \(videoTrack.readyState)")
+      remoteVideoTrack = videoTrack
       // attach to existing views
-      for (_, v) in views { track.add(v) }
+      DispatchQueue.main.async { [weak self] in
+        guard let self = self else { return }
+        print("[CapWebRTC] Attaching video track to \(self.views.count) existing views")
+        for (viewId, v) in self.views {
+          print("[CapWebRTC] Adding video track to view \(viewId), view frame: \(v.frame), enabled: \(v.isEnabled), hidden: \(v.isHidden)")
+          videoTrack.add(v)
+          // Ensure view is visible and enabled
+          v.isEnabled = true
+          v.isHidden = false
+        }
+      }
+    } else if let audioTrack = track as? RTCAudioTrack {
+      print("[CapWebRTC] ✅ Audio track received via didAdd rtpReceiver: \(audioTrack.trackId)")
+    } else if track != nil {
+      print("[CapWebRTC] ⚠️ Unknown track type: \(type(of: track!))")
     }
   }
 

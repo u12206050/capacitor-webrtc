@@ -299,13 +299,14 @@ export class CapWebRTCWeb extends WebPlugin implements CapWebRTCPlugin {
       // Some ICE candidates may fail if the connection state has changed
       // or if the candidate is invalid - this is often non-fatal
       // Don't throw to allow other candidates to be processed
-      console.warn('Failed to add ICE candidate (non-fatal):', error, {
-        candidate: cand.candidate.substring(0, 50) + '...',
-        sdpMid: cand.sdpMid,
-        sdpMLineIndex: cand.sdpMLineIndex,
-        connectionState: this.pc.connectionState,
-        hasRemoteDescription: !!this.pc.remoteDescription,
-      });
+      // Logging commented out to reduce noise - uncomment for debugging
+      // console.warn('Failed to add ICE candidate (non-fatal):', error, {
+      //   candidate: cand.candidate.substring(0, 50) + '...',
+      //   sdpMid: cand.sdpMid,
+      //   sdpMLineIndex: cand.sdpMLineIndex,
+      //   connectionState: this.pc.connectionState,
+      //   hasRemoteDescription: !!this.pc.remoteDescription,
+      // });
     }
   }
 
